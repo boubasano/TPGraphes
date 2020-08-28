@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@2.8.0"></script>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css"
+          integrity="sha384-JcKb8q3iqJ61gNV9KGb8thSsNjpSL0n8PARn9HuZOnIxN0hoP+VmmDGMN5t9UJ0Z" crossorigin="anonymous">
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+
+<h2> Tableau de bord de l'investisseur cryptos</h2>
+<form>
+
+    <label for="cryptos">Determiner les</label>
+    <select id="cryptos" name="symboleCrypto" onChange="chargeDonneesEtAffichage(this.value);">
+        <option value="3">3</option>
+        <option value="5">5</option>
+        <option value="10">10</option>
+    </select>
+
+    <label for="jours">cryptos avec la plus grande variation moyenne depuis: </label>
+    <select id="jours" name="variationJours"  onChange="afficheAuJour(this.value);">
+        <option value="3jours">3 jours</option>
+        <option value="7jours">7 jours</option>
+        <option value="10jours">30 jours</option>
+    </select>
+
+</form>
+<div class="container">
+<div class="row">
+    <div class="col-md-6">
+        <canvas id="myChartPie" height="150"></canvas>
+    </div>
+    <div class="col-md-6">
+        <canvas id="myChartCours" height="150"></canvas>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <canvas id="myChartVolume" height="150"></canvas>
+    </div>
+    <div class="col-md-6">
+        <canvas id="myChartCapitalisation" height="150"></canvas>
+    </div>
+</div>
+</div>
+
+        <script>
+
+            // variable globale qui me permet d'acceder à mes données cryptos
+            let listeCryptosJour = [];
+
+
+            let chargeDonneesEtAffichage = async (nombreJours) => {
+
+                // Charge données
+                let resp = await fetch('variations_nombrejours.php?periode=' + nombreJours);
+                listeCryptosJour = await resp.json();
+
+
+                // trie des elements
+                listeCryptosJour = listeCryptosJour.sort((elementA, elementB) => {
+                    let varA = parseFloat(elementA.pct_variation_24_h);
+                    let varB = parseFloat(elementB.pct_variation_24_h);
+                    if (varA > varB) {
+                        return -1;
+                    } else if (varA < varB) {
+                        return 1;
+                    } else {
+                        return 0;
+                    }
+                });
+
+                let nombreCryptosAafficher = document.querySelector('#cryptos').value;
+                listeCryptosJour = listeCryptosJour.filter((element, indice) => {
+                    if (nombreCryptosAafficher == '3') {
+                        return indice < 3;
+                    } else if (nombreCryptosAafficher == '5') {
+                        return indice < 5;
+                    } else if (nombreCryptosAafficher == '10') {
+                        return indice < 10;
+                    } else
+                        return false;
+                });
+
+
+                // affichage graphique en camembrt
+                let labels = listeCryptosJour.map(listeCryptos => {
+                    return listeCryptos.symbole;
+                });
+                // Map JSON values back to values array
+                let values = listeCryptosJour.map(listeCryptos => {
+                    return parseFloat(listeCryptos.pct_variation_24_h);
+                });
+
+                graphiqueCapitalisation(labels, values);
+                graphiqueVolume(labels, values);
+                graphiqueCours(labels, values);
+                graphiqueCamembert(labels, values);
+                chargeDonneesCoursVolumeEtCapitalisation();
+            };
+
+            let chargeDonneesCoursVolumeEtCapitalisation = async (nombreElement) => {
+                // Charge données
+                let resp = await fetch('valeurs_moyennes_journalieres.php?symbole=' + nombreElement);
+                listeCryptosJour = await resp.json();
+
+                //charge les donnees des cours des cryptos au jour
+                listeCryptosJour.map(listeCours => {
+                    return listeCours.valeur;
+                });
+
+                // Map JSON values back to values array
+                listeCryptosJour.map(listeCours => {
+                    return parseFloat(listeCours.date_cours);
+                });
+
+
+                //charge les donnees du volume des cryptos au jour
+                listeCryptosJour.map(listeVolume => {
+                    return listeVolume.valeur;
+                });
+                // Map JSON values back to values array
+                listeCryptosJour.map(listeVolume => {
+                    return parseFloat(listeVolume.volume_24_h);
+                });
+
+
+                //charge les donnees de la capitalisation sur le marché des cryptos au jour
+                listeCryptosJour.map(capitalisation => {
+                    return capitalisation.valeur;
+                });
+                // Map JSON values back to values array
+                listeCryptosJour.map(capitalisation => {
+                    return parseFloat(capitalisation.market_cap);
+                });
+
+            };
+/*
+           function afficheAuJour(nombreJours) {
+                let donneesJour = document.querySelector('#jours').value;
+                listeCryptosJour = listeCryptosJour.filter((element, indice) => {
+                    if (donneesJour == '3 jours') {
+                        return chargeDonneesEtAffichage(3);;
+                    } else if (donneesJour == '7 jours') {
+                        return chargeDonneesEtAffichage(7);;
+                    } else if (donneesJour == '30 jours') {
+                        return chargeDonneesEtAffichage(30);;
+                    } else;
+
+                });
+               chargeDonneesEtAffichage(nombreJours);
+            };*/
+
+
+            function graphiqueCamembert(labels, values) {
+
+                let backgroundColors = listeCryptosJour.map(elem => genereCouleur());
+                let content = document.querySelector("#myChartPie").getContext('2d');
+                let myChart = new Chart(content, {
+                    type: 'pie',
+                    data: {
+                        labels: labels, // Our labels
+                        datasets: [{
+                            label: 'Variation',
+                            backgroundColor: backgroundColors,
+                            borderColor: 'rgb(255, 99, 132)',
+                            data: values
+                        }]
+                    },
+
+                });
+                return myChart;
+            };
+
+
+            function graphiqueVolume(labels, values) {
+                let content = document.querySelector("#myChartVolume").getContext('2d');
+                let backgroundColors = listeCryptosJour.map(elem => genereCouleur());
+                let myChart = new Chart(content, {
+
+                    type: 'line',
+                    data: {
+                        labels: labels, // Our labels
+                        datasets: [{
+                            label: 'Volume des échanges',
+                            borderColor: backgroundColors,
+                            backgroundColor: backgroundColors,
+                            fill: false,
+                            data: values
+                        }],
+                        yAxisID: 'y-axis-1'
+                    },
+                });
+                return myChart;
+            };
+
+
+            function graphiqueCours(labels, values) {
+                let backgroundColors = listeCryptosJour.map(elem => genereCouleur());
+                let content = document.querySelector("#myChartCours").getContext('2d');
+                let myChart = new Chart(content, {
+
+                    type: 'line',
+                    data: {
+                        labels: labels, // Our labels
+                        datasets: [{
+                            label: 'Cours des échanges',
+                            borderColor: backgroundColors,
+                            backgroundColor: backgroundColors,
+                            fill: false,
+                            data: values
+                        }],
+                        yAxisID: 'y-axis-1'
+                    },
+                });
+                return myChart;
+            };
+
+            function graphiqueCapitalisation(labels, values) {
+                let backgroundColors = listeCryptosJour.map(elem => genereCouleur());
+                let content = document.querySelector("#myChartCapitalisation").getContext('2d');
+                let myChart = new Chart(content, {
+
+                    type: 'line',
+                    data: {
+                        labels: labels, // Our labels
+                        datasets: [{
+                            label: 'Capitalisation des marchés',
+                            borderColor: backgroundColors,
+                            backgroundColor: backgroundColors,
+                            fill: false,
+                            data: values
+                        }],
+                        yAxisID: 'y-axis-1'
+                    },
+                });
+                return myChart;
+            };
+
+
+            let genereCouleur = () => {
+
+                let rouge = Math.round(Math.random() * 255);
+                let vert = Math.round(Math.random() * 255);
+                let bleu = Math.round(Math.random() * 255);
+
+                return `rgb(${rouge},${vert},${bleu})`;
+
+            };
+
+
+            chargeDonneesEtAffichage(3);
+
+        </script>
+        <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"
+                integrity="sha384-DfXdz2htPH0lsSSs5nCTpuj/zy4C+OGpamoFVy38MVBnE+IbbVYUew+OrCXaRkfj"
+                crossorigin="anonymous"></script>
+        <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"
+                integrity="sha384-9/reFTGAW83EW2RDu2S0VKaIzap3H66lZH81PoYlFhbGU+6BZp6G7niu735Sk7lN"
+                crossorigin="anonymous"></script>
+        <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"
+                integrity="sha384-B4gt1jrGC7Jh4AgTPSdUtOBvfO8shuf57BaghqFfPlYxofvL8/KUEfYiJOMMV+rV"
+                crossorigin="anonymous"></script>
+
+</body>
+</html>
